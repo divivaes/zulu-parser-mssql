@@ -12,6 +12,12 @@ app.use(cors())
 // Initializing morgan
 app.use(morgan('combined'))
 
+// Importing parsers
+const flowmeter = require('./flowmeter')
+const pressure = require('./pressure')
+flowmeter()
+pressure()
+
 // Starting server
 const port = process.env.PORT || 5000
 
