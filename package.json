@@ -1,0 +1,28 @@
+{
+  "name": "zulu-parser-mssql",
+  "version": "1.0.0",
+  "description": "WRM Pressure microservice",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app",
+    "dev": "nodemon app",
+    "i-w-s": "winser -i",
+    "un-w-s": "winser -r"
+  },
+  "author": "Kanat Kunikeyev <divivaes@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "cron": "^1.7.1",
+    "dotenv": "^8.0.0",
+    "express": "^4.17.1",
+    "moment": "^2.24.0",
+    "morgan": "^1.9.1",
+    "mssql": "^5.1.0",
+    "nodemon": "^1.19.1",
+    "request": "^2.88.0",
+    "winser": "^1.0.3",
+    "winston": "^3.2.1"
+  }
+}
