@@ -97,13 +97,18 @@ const flowmeter = () => {
     })
   }
 
-  const cronJob_getStats_after_start = cron.job('0 */15 * * * *', () => {
-    let time = moment()
-      .format('YYYY-MM-DD hh:mm:ss')
-      .trim()
-    logs.info(`-=cronJob_FLOWMETER_getStats_after_start=- started at - ${time}`)
-    updateStats()
-  })
+  const cronJob_getStats_after_start = cron.job(
+    process.env.APP_CRON_TIME,
+    () => {
+      let time = moment()
+        .format('YYYY-MM-DD hh:mm:ss')
+        .trim()
+      logs.info(
+        `-=cronJob_FLOWMETER_getStats_after_start=- started at - ${time}`
+      )
+      updateStats()
+    }
+  )
 
   setInitialStats()
 
