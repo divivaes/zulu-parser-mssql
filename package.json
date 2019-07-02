@@ -1,7 +1,8 @@
 {
-  "name": "zulu-parser-mssql",
+  "name": "WRM-Microservice-MSSQL",
   "version": "1.0.0",
   "description": "WRM Pressure microservice",
+  "private": true,
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

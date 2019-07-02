@@ -1,4 +1,4 @@
-const mysql = require('mysql')
+const sql = require('mssql')
 const request = require('request')
 const cron = require('cron')
 const moment = require('moment')
@@ -6,99 +6,110 @@ const logs = require('./config/logger').logger
 require('dotenv').config()
 
 // Connection to DB
-const db_config = require('./config/db')
-const connection = mysql.createConnection(db_config.connection)
-connection.query(`USE ${db_config.database}`)
+const db_config = require('./config/db').connection
 
-const presure = () => {
-  const setInitialStats = () => {
-    logs.server('Initializing -=PRESSURE=- stats getter method')
-    connection.query('SELECT id, name FROM PRESSURE', (err, rows) => {
-      if (err) logs.info(`Error on selecting from table PRESSURE => - ${err}`)
-      if (rows.length === 96) {
-        logs.info('Server rebooted. Updating pressure stats')
-        updateStats()
-      } else if (rows.length > 97) {
-        resetStats()
-        insertStats()
-      } else if (rows.length === 0) {
-        logs.info('Table -=pressure=- is empty. Inserting new data')
-        insertStats()
-      }
-    })
-  }
-
-  const resetStats = async () => {
-    connection.query('TRUNCATE TABLE pressure', err => {
-      if (err) logs.info(`Error on truncating table PRESSURE => - ${err}`)
-      logs.info('Too much data and table will be truncated. Inserting new data')
-    })
-  }
-
-  const insertStats = async () => {
-    await request(
-      {
-        url: process.env.APP_WRM_PRESSURE_URL,
-        method: 'GET',
-        headers: [
-          {
-            name: 'Content-Type',
-            value: 'application/json'
-          }
-        ]
-      },
-      (error, response, body) => {
-        if (error) logs.info(`Error on request WRM_PRESSURE_URL - ${error}`)
-
-        let time = moment()
-          .format('YYYY-MM-DD hh:mm:ss')
-          .trim()
-        body = JSON.parse(body)
-        body.forEach(obj => {
-          connection.query('INSERT INTO pressure SET ?', obj, (err, rows) => {
-            if (err)
-              logs.info(`Error on inserting to table PRESSURE => - ${err}`)
-          })
-        })
-        logs.info(`Inserted new values to table PRESSURE on - ${time}`)
-      }
-    )
-  }
-
-  const updateStats = async () => {
-    await request(
-      {
-        url: process.env.APP_WRM_PRESSURE_URL,
-        method: 'GET',
-        headers: [
-          {
-            name: 'Content-Type',
-            value: 'application/json'
-          }
-        ]
-      },
-      (error, response, body) => {
-        if (error) logs.info(`Error on request WRM_PRESSURE_URL - ${error}`)
-
-        let time = moment()
-          .format('YYYY-MM-DD hh:mm:ss')
-          .trim()
-        body = JSON.parse(body)
-        body.forEach(obj => {
-          connection.query(
-            `UPDATE pressure SET ? WHERE id_sensor = ${obj.id_sensor} `,
-            obj,
-            (err, rows) => {
-              if (err)
-                logs.info(`Error on updating to table PRESSURE => - ${err}`)
+const pressure = () => {
+    const setInitialStats = () => {
+        logs.info('Initializing -=PRESSURE=- stats getter method')
+        
+        new sql.ConnectionPool(db_config).connect().then(pool => {
+            return pool.request().query("SELECT * FROM pressure")
+        }).then(result => {
+            if (result.rowsAffected[0] === 4) {
+                logs.info('Server rebooted. Updating pressure stats')
+                updateStats()
+            } else if (result.rowsAffected[0] > 4) {
+                logs.info("Too much data in pressure table. Table will be truncated")
+                resetStats()
+                insertStats()
+            } else if (result.rowsAffected < 4) {
+                logs.info('Table -=pressure=- doesnt fill requirements. Inserting new data')
+                resetStats()
+                insertStats()
             }
-          )
+            sql.close()
+        }).catch(err => {
+            logs.info("Error on connection to DB on selecting => ", err)
+            sql.close()
         })
-        logs.info(`Updated values in table PRESSURE on - ${time}`)
-      }
-    )
-  }
+           
+    }  
 
+    const insertStats = async () => {
+        await request(
+        {
+            url: process.env.APP_WRM_PRESSURE_URL,
+            method: 'GET',
+            headers: [
+              {
+                name: 'Content-Type',
+                value: 'application/json'
+              }
+            ]
+        },
+        (error, response, body) => {
+        if (error) logs.info(`Error on request WRM_PRESSURE_URL - ${error}`)
+
+        new sql.ConnectionPool(db_config).connect().then(pool => {
+            let time = moment()
+                    .format('YYYY-MM-DD hh:mm:ss')
+                    .trim()
+            body = JSON.parse(body)
+            body.forEach(obj => {
+                pool.request().query(`insert into pressure(name, id_sensor, type_int, overValue, underValue, value, time, previous, cp_value, cp_time, cp_previous, position, status) values ('${obj.name}', '${obj.id_sensor}',  '${obj.type_int}', '${obj.overValue}', '${obj.underValue}', '${obj.value}', '${obj.time}', '${obj.previous}', '${obj.cp_value}', '${obj.cp_time}', '${obj.cp_previous}', '${obj.position}', '${obj.status}' )`)
+            })
+            sql.close() 
+            }).catch(err => {
+                logs.info("Error on connection to DB on inserting => ", err)
+                sql.close()
+            })
+        })
+    }
+
+    const updateStats = async () => {
+        await request(
+        {
+            url: process.env.APP_WRM_PRESSURE_URL,
+            method: 'GET',
+            headers: [
+              {
+                name: 'Content-Type',
+                value: 'application/json'
+              }
+            ]
+        },
+        (error, response, body) => {
+            if (error) logs.info(`Error on request WRM_FLOWMETER_URL - ${error}`)
+
+            new sql.ConnectionPool(db_config).connect().then(pool => {
+                let time = moment()
+                    .format('YYYY-MM-DD hh:mm:ss')
+                    .trim()
+                body = JSON.parse(body)
+                body.forEach(obj => {
+                    pool.request().query(`update pressure set name = '${obj.name}', type_int = '${obj.type_int}', id_sensor = '${obj.id_sensor}', overValue = '${obj.overValue}', underValue = '${obj.underValue}', value = '${obj.value}', time = '${obj.time}', previous = '${obj.previous}', cp_value = '${obj.cp_value}', cp_time = '${obj.cp_time}', cp_previous = '${obj.cp_previous}', position = '${obj.position}', status = '${obj.status}' where id_sensor = ${obj.id_sensor} `)
+                })
+                sql.close() 
+            }).catch(err => {
+                logs.info("Error on connection to DB on inserting => ", err)
+                sql.close()
+            })
+        })
+    }
+
+
+    const resetStats = () => {
+        new sql.ConnectionPool(db_config).connect().then(pool => {
+            pool.request().query("truncate table pressure")
+            logs.info("Table PRESSURE truncated succesfully")
+            sql.close()  
+        }).catch(err => {
+            logs.info("Error on connection to DB on truncating => ", err)
+            sql.close()
+        })
+    }
+
+<<<<<<< HEAD
   const cronJob_getStats_after_start = cron.job(
     process.env.APP_CRON_TIME,
     () => {
@@ -111,10 +122,21 @@ const presure = () => {
       updateStats()
     }
   )
+=======
+  const cronJob_getStats_after_start = cron.job('0 */15 * * * *', () => {
+    let time = moment()
+      .format('YYYY-MM-DD hh:mm:ss')
+      .trim()
+    logs.info(`-=cronJob_PRESSURE_getStats_after_start=- started at - ${time}`)
+    updateStats()
+  })
+>>>>>>> 0614c480258516365e4d2a32aeffbbad8d9b8038
 
   setInitialStats()
 
   cronJob_getStats_after_start.start()
+
+
 }
 
-module.exports = presure
+module.exports = pressure
